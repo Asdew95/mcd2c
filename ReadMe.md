@@ -4,6 +4,8 @@ Generate C serialization/deserialization code from the minecraft-data protodef p
 
 Requires [python-minecraft-data](https://github.com/SpockBotMC/python-minecraft-data)
 
+This was originally created by [SpockBotMC](https://github.com/SpockBotMC/), forked to work with 1.8.
+
 ## Usage
 
 `python mcd2c.py [version]`
