@@ -842,166 +842,41 @@ char *dec_particle(mc_particle *dest, char *source) {
 // not worth it. Serious thought should be given to a better buffer system that
 // can side-step this insanity. Raw char * is just asking for pain.
 int walk_metadata(char *source, size_t max_len) {
-  if(!max_len)
-    return -1;
-  int total = 0;
-  for(int size, ret; *(unsigned char *) source != 0xFF;
-       source += size, max_len -= size, total += size) {
-    total++;
-    if((ret = walk_varint(++source, --max_len)) < 0)
-      return ret;
-    max_len -= ret;
-    total += ret;
-    int32_t type;
-    source = dec_varint(&type, source);
-    switch(type) {
-      case meta_byte:
-      case meta_boolean:
-      case meta_direction:
-        size = sizeof(char);
-        break;
-      case meta_varint:
-      case meta_optblockid:
-      case meta_pose:
-        if((size = walk_varint(source, max_len)) < 0)
-          return size;
-        break;
-      case meta_float:
-        size = sizeof(float);
-        break;
-      case meta_string:
-      case meta_chat:
-        if((size = walk_string(source, max_len)) < 0)
-          return size;
-        break;
-      case meta_optchat:
-        size = sizeof(char);
-        if(*source) {
-          if((ret = walk_string(source + 1, max_len - 1)) < 0)
-            return ret;
-          size += ret;
-        }
-        break;
-      case meta_slot:
-        if((size = walk_slot(source, max_len)) < 0)
-          return size;
-        break;
-      case meta_rotation:
-        size = sizeof(float) * 3;
-        break;
-      case meta_position:
-        size = sizeof(uint64_t);
-        break;
-      case meta_optposition:
-        size = sizeof(char);
-        if(*source)
-          size += sizeof(uint64_t);
-        break;
-      case meta_optuuid:
-        size = sizeof(char);
-        if(*source)
-          size += sizeof(uint64_t) * 2;
-        break;
-      case meta_nbt:
-        if((size = walk_nbt(source, max_len)) < 0)
-          return size;
-        break;
-      case meta_particle:
-        if((size = walk_particle(source, max_len)) < 0)
-          return size;
-        break;
-      case meta_villagerdata:
-        size = 0;
-        for(size_t j = 0; j < 3; j++) {
-          if((ret = walk_varint(source, max_len)) < 0)
-            return ret;
-          source += ret;
-          max_len -= ret;
-          total += ret;
-        }
-        break;
-      case meta_optvarint:
-        size = sizeof(char);
-        if(*source) {
-          if((ret = walk_varint(source + 1, max_len - 1)) < 0)
-            return ret;
-          size += ret;
-        }
-        break;
-      default:
-        return -1;
-        break;
-    }
-    // Need to read at least one more byte to get the meta close tag 0xFF
-    // Therefore we use <= here instead of just <
-    if(max_len <= (size_t) size)
-      return -1;
-  }
-  return ++total;
+  // TO BE IMPLEMENTED FOR 1.8
+  return -1;
 }
 
 // TODO: counting metatags takes almost as long as decoding them
 // we could write a fast_decode that just groups those two
 size_t count_metatags(char *source) {
   size_t count = 0;
-  for(int32_t type; *(unsigned char *) source != 0xFF; count++) {
-    source = dec_varint(&type, ++source);
+  for(int8_t type; *(unsigned char *) source != 0x7F; count++) {
+    source = dec_byte(&type, source);
+    type = type >> 5 & 0x7;
     switch(type) {
       case meta_byte:
-      case meta_boolean:
-      case meta_direction:
-        source += sizeof(char);
+        source++;
         break;
-      case meta_varint:
-      case meta_optblockid:
-      case meta_pose:
-        source += walk_varint(source, NO_OVERFLOW);
+      case meta_short:
+        source += 2;
+        break;
+      case meta_int:
+        source += 4;
         break;
       case meta_float:
-        source += sizeof(float);
+        source += 4;
         break;
       case meta_string:
-      case meta_chat:
         source += walk_string(source, NO_OVERFLOW);
-        break;
-      case meta_optchat:
-        if(*source++)
-          source += walk_string(source, NO_OVERFLOW);
         break;
       case meta_slot:
         source += walk_slot(source, NO_OVERFLOW);
         break;
-      case meta_rotation:
-        source += sizeof(float) * 3;
-        break;
       case meta_position:
-        source += sizeof(uint64_t);
+        source += 3 * 4;
         break;
-      case meta_optposition:
-        if(*source++)
-          source += sizeof(uint64_t);
-        break;
-      case meta_optuuid:
-        if(*source++)
-          source += sizeof(uint64_t) * 2;
-        break;
-      case meta_nbt:
-        source += walk_nbt(source, NO_OVERFLOW);
-        break;
-      case meta_particle:
-        source += walk_particle(source, NO_OVERFLOW);
-        break;
-      case meta_villagerdata:
-        for(size_t j = 0; j < 3; j++)
-          source += walk_varint(source, NO_OVERFLOW);
-        break;
-      case meta_optvarint:
-        if(*source++)
-          source += walk_varint(source, NO_OVERFLOW);
-        break;
-      default:
-        //ToDo: This probably isn't right
-        return 0;
+      case meta_rotation:
+        source += 3 * 4;
         break;
     }
   }
@@ -1011,68 +886,31 @@ size_t count_metatags(char *source) {
 size_t size_metadata(mc_metadata metadata) {
   size_t size = 0;
   for(size_t i = 0; i < metadata.len; i++) {
-    size += sizeof(metadata.tags[0].index);
-    size += size_varint(metadata.tags[i].type);
+    size += 1;
     switch(metadata.tags[i].type) {
       case meta_byte:
-      case meta_boolean:
-      case meta_direction:
-        size += sizeof(char);
+        size += 1;
         break;
-      case meta_varint:
-      case meta_optblockid:
-      case meta_pose:
-        size += size_varint(metadata.tags[i].varint);
+      case meta_short:
+        size += 2;
+        break;
+      case meta_int:
+        size += 4;
         break;
       case meta_float:
-        size += sizeof(float);
+        size += 4;
         break;
       case meta_string:
-      case meta_chat:
         size += size_string(metadata.tags[i].string);
-        break;
-      case meta_optchat:
-        size += sizeof(char);
-        if(metadata.tags[i].opt)
-          size += size_string(metadata.tags[i].string);
         break;
       case meta_slot:
         size += size_slot(metadata.tags[i].slot);
         break;
-      case meta_rotation:
-        size += sizeof(float) * 3;
-        break;
       case meta_position:
-        size += sizeof(uint64_t);
+        size += 3 * 4;
         break;
-      case meta_optposition:
-        size += sizeof(char);
-        if(metadata.tags[i].opt)
-          size += sizeof(uint64_t);
-        break;
-      case meta_optuuid:
-        size += sizeof(char);
-        if(metadata.tags[i].opt)
-          size += sizeof(uint64_t) * 2;
-        break;
-      case meta_nbt:
-        size += size_nbt(metadata.tags[i].nbt);
-        break;
-      case meta_particle:
-        size += size_particle(metadata.tags[i].particle);
-        break;
-      case meta_villagerdata:
-        for(size_t j = 0; j < 3; j++)
-          size += size_varint(metadata.tags[i].villagerdata[j]);
-        break;
-      case meta_optvarint:
-        size += sizeof(char);
-        if(metadata.tags[i].opt)
-          size += size_varint(metadata.tags[i].varint);
-        break;
-      default:
-        //See above default case
-        return 0;
+      case meta_rotation:
+        size += 3 * 4;
         break;
     }
   }
@@ -1081,167 +919,58 @@ size_t size_metadata(mc_metadata metadata) {
 
 char *enc_metadata(char *dest, mc_metadata source) {
   for(size_t i = 0; i < source.len; i++) {
-    dest = enc_byte(dest, source.tags[i].index);
-    dest = enc_varint(dest, source.tags[i].type);
+    dest = enc_byte(dest, (source.tags[i].index & 0x1f) |
+            (source.tags[i].type << 5 & 0xe0));
     switch(source.tags[i].type) {
       case meta_byte:
-      case meta_boolean:
-      case meta_direction:
         dest = enc_byte(dest, source.tags[i].b);
         break;
-      case meta_varint:
-      case meta_optblockid:
-      case meta_pose:
-        dest = enc_varint(dest, source.tags[i].varint);
+      case meta_short:
+        dest = enc_be16(dest, source.tags[i].s);
+        break;
+      case meta_int:
+        dest = enc_be32(dest, source.tags[i].s);
         break;
       case meta_float:
         dest = enc_bef32(dest, source.tags[i].f);
         break;
       case meta_string:
-      case meta_chat:
         dest = enc_string(dest, source.tags[i].string);
-        break;
-      case meta_optchat:
-        dest = enc_byte(dest, source.tags[i].opt);
-        if(source.tags[i].opt)
-          dest = enc_string(dest, source.tags[i].string);
         break;
       case meta_slot:
         dest = enc_slot(dest, source.tags[i].slot);
         break;
-      case meta_rotation:
-        dest = enc_bef32(dest, source.tags[i].rot.x);
-        dest = enc_bef32(dest, source.tags[i].rot.y);
-        dest = enc_bef32(dest, source.tags[i].rot.z);
-        break;
       case meta_position:
-        dest = enc_position(dest, source.tags[i].pos);
+        dest = enc_be32(dest, source.tags[i].pos.x);
+        dest = enc_be32(dest, source.tags[i].pos.y);
+        dest = enc_be32(dest, source.tags[i].pos.z);
         break;
-      case meta_optposition:
-        dest = enc_byte(dest, source.tags[i].opt);
-        if(source.tags[i].opt)
-          dest = enc_position(dest, source.tags[i].pos);
-        break;
-      case meta_optuuid:
-        dest = enc_byte(dest, source.tags[i].opt);
-        if(source.tags[i].opt)
-          dest = enc_uuid(dest, source.tags[i].uuid);
-        break;
-      case meta_nbt:
-        dest = enc_nbt(dest, source.tags[i].nbt);
-        break;
-      case meta_particle:
-        dest = enc_particle(dest, source.tags[i].particle);
-        break;
-      case meta_villagerdata:
-        for(size_t j = 0; j < 3; j++)
-          dest = enc_varint(dest, source.tags[i].villagerdata[j]);
-        break;
-      case meta_optvarint:
-        dest = enc_byte(dest, source.tags[i].opt);
-        if(source.tags[i].opt)
-          dest = enc_varint(dest, source.tags[i].varint);
+      case meta_rotation:
+        dest = enc_bef32(dest, source.tags[i].rot.pitch);
+        dest = enc_bef32(dest, source.tags[i].rot.yaw);
+        dest = enc_bef32(dest, source.tags[i].rot.roll);
         break;
     }
   }
-  return enc_byte(dest, 0);
+  return enc_byte(dest, 0x7f);
 }
 
 char *dec_metadata(mc_metadata *dest, char *source) {
-  size_t len = count_metatags(source);
-  dest->len = len;
-  if(!(dest->tags = malloc(len * sizeof(mc_metatag))))
-    return NULL;
-  for(size_t i = 0; i < len; i++) {
-    source = dec_byte(&dest->tags[i].index, source);
-    source = dec_varint(&dest->tags[i].type, source);
-    switch(dest->tags[i].type) {
-      case meta_byte:
-      case meta_boolean:
-      case meta_direction:
-        source = dec_byte((uint8_t *)&dest->tags[i].b, source);
-        break;
-      case meta_varint:
-      case meta_optblockid:
-      case meta_pose:
-        source = dec_varint(&dest->tags[i].varint, source);
-        break;
-      case meta_float:
-        source = dec_bef32(&dest->tags[i].f, source);
-        break;
-      case meta_string:
-      case meta_chat:
-        source = dec_string(&dest->tags[i].string, source);
-        break;
-      case meta_optchat:
-        source = dec_byte((uint8_t *)&dest->tags[i].opt, source);
-        if(dest->tags[i].opt)
-          source = dec_string(&dest->tags[i].string, source);
-        break;
-      case meta_slot:
-        source = dec_slot(&dest->tags[i].slot, source);
-        break;
-      case meta_rotation:
-        source = dec_bef32(&dest->tags[i].rot.x, source);
-        source = dec_bef32(&dest->tags[i].rot.y, source);
-        source = dec_bef32(&dest->tags[i].rot.z, source);
-        break;
-      case meta_position:
-        source = dec_position(&dest->tags[i].pos, source);
-        break;
-      case meta_optposition:
-        source = dec_byte((uint8_t *)&dest->tags[i].opt, source);
-        if(dest->tags[i].opt)
-          source = dec_position(&dest->tags[i].pos, source);
-        break;
-      case meta_optuuid:
-        source = dec_byte((uint8_t *)&dest->tags[i].opt, source);
-        if(dest->tags[i].opt)
-          source = dec_uuid(&dest->tags[i].uuid, source);
-        break;
-      case meta_nbt:
-        source = dec_nbt(&dest->tags[i].nbt, source);
-        break;
-      case meta_particle:
-        source = dec_particle(&dest->tags[i].particle, source);
-        break;
-      case meta_villagerdata:
-        for(size_t j = 0; j < 3; j++)
-          source = dec_varint(&dest->tags[i].villagerdata[j], source);
-        break;
-      case meta_optvarint:
-        source = dec_byte((uint8_t *) &dest->tags[i].opt, source);
-        if(dest->tags[i].opt)
-          source = dec_varint(&dest->tags[i].varint, source);
-        break;
-    }
-  }
-  return ++source;
+  // TO BE IMPLEMENTED FOR 1.8
+  return NULL;
 }
 
 void free_metadata(mc_metadata metadata) {
   for(size_t i = 0; i < metadata.len; i++) {
     switch(metadata.tags[i].type) {
-    case meta_string:
-    case meta_chat:
-      sdsfree(metadata.tags[i].string);
-      break;
-    case meta_optchat:
-      if(metadata.tags[i].opt) {
+      case meta_string:
         sdsfree(metadata.tags[i].string);
-      }
-      break;
-    case meta_slot:
-      free_slot(metadata.tags[i].slot);
-      break;
-    case meta_nbt:
-      free_nbt(metadata.tags[i].nbt);
-      break;
-    case meta_particle:
-      free_particle(metadata.tags[i].particle);
-      break;
-    default:
-      break;
+        break;
+      case meta_slot:
+        free_slot(metadata.tags[i].slot);
+        break;
+      default:
+        break;
     }
   }
 }

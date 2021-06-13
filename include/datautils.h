@@ -104,6 +104,7 @@ char *enc_optnbt(char *dest, nbt_node *source);
 char *dec_optnbt(nbt_node **dest, char *source);
 #define free_optnbt(x) nbt_free(x)
 
+// INVALID FOR 1.8!
 //Inventory slot
 typedef struct {
   char present;
@@ -226,47 +227,36 @@ char *dec_particle(mc_particle *dest, char *source);
 
 typedef enum {
   meta_byte,
-  meta_varint,
+  meta_short,
+  meta_int,
   meta_float,
   meta_string,
-  meta_chat,
-  meta_optchat,
   meta_slot,
-  meta_boolean,
-  meta_rotation,
   meta_position,
-  meta_optposition,
-  meta_direction,
-  meta_optuuid,
-  meta_optblockid,
-  meta_nbt,
-  meta_particle,
-  meta_villagerdata,
-  meta_optvarint,
-  meta_pose
+  meta_rotation,
 } meta_type;
 
 //Just a bitch of a type really
 typedef struct {
   uint8_t index;
-  int32_t type;
-  char opt;
+  meta_type type;
   union {
     int8_t b;
-    int32_t varint;
+    int16_t s;
+    int32_t i;
     float f;
     sds string;
     mc_slot slot;
     struct {
-      float x;
-      float y;
-      float z;
+        int32_t x;
+        int32_t y;
+        int32_t z;
+    } pos;
+    struct {
+        float pitch;
+        float yaw;
+        float roll;
     } rot;
-    mc_position pos;
-    mc_uuid uuid;
-    nbt_node *nbt;
-    mc_particle particle;
-    int32_t villagerdata[3];
   };
 } mc_metatag;
 
