@@ -104,12 +104,11 @@ char *enc_optnbt(char *dest, nbt_node *source);
 char *dec_optnbt(nbt_node **dest, char *source);
 #define free_optnbt(x) nbt_free(x)
 
-// INVALID FOR 1.8!
 //Inventory slot
 typedef struct {
-  char present;
-  int32_t id;
+  int16_t item;
   uint8_t count;
+  int16_t damage;
   nbt_node *nbt;
 } mc_slot;
 
