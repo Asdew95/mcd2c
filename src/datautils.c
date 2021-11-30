@@ -551,64 +551,41 @@ char *dec_optnbt(nbt_node **dest, char *source) {
 
 // Inventory slot
 int walk_slot(char *source, size_t max_len) {
-  mc_slot slot;
-  if(max_len < sizeof(slot.present))
-    return -1;
-  source = dec_byte((uint8_t *) &slot.present, source);
-  size_t size = sizeof(slot.present);
-  if(!slot.present)
-    return size;
-  int ret = walk_varint(source, --max_len);
-  if(ret < 0)
-    return -1;
-  if(max_len -= ret < sizeof(slot.count))
-    return -1;
-  max_len -= sizeof(slot.count);
-  size += ret + sizeof(slot.count);
-  source += ret + sizeof(slot.count);
-  if(*source != TAG_COMPOUND)
-    return ++size;
-  ret = walk_nbt(source, max_len);
-  if(ret < 0)
-    return -1;
-  return size + ret;
+  // TO BE IMPLEMENTED FOR 1.8
+  return -1;
 }
 
 size_t size_slot(mc_slot slot) {
-  if(!slot.present)
-    return sizeof(slot.present);
-  size_t size = sizeof(slot.present) + sizeof(slot.count);
-  size += size_varint(slot.id);
-  if(slot.nbt)
-    size += size_nbt(slot.nbt);
+  size_t size = 2;
+  if(slot.item != -1) {
+    size += 3;
+    if(slot.nbt != NULL)
+      size += size_nbt(slot.nbt);
+    else
+      size += 1;
+  }
   return size;
 }
 
 // Just like varint/long, we assume you're being a good citizen and using the
 // size function to ensure no buffer overflows.
 char *enc_slot(char *dest, mc_slot source) {
-  dest = enc_byte(dest, (uint8_t) source.present);
-  if(!source.present)
+  dest = enc_be16(dest, source.item);
+  if(source.item == -1) {
     return dest;
-  dest = enc_varint(dest, (uint32_t) source.id);
+  }
   dest = enc_byte(dest, source.count);
-  if(!source.nbt)
+  dest = enc_be16(dest, source.damage);
+  if(source.nbt != NULL)
+    return enc_nbt(dest, source.nbt);
+  else
     return enc_byte(dest, 0);
-  return enc_nbt(dest, source.nbt);
 }
 
 // dec_nbt allocates memory, this can fail and return NULL
 char *dec_slot(mc_slot *dest, char *source) {
-  source = dec_byte((uint8_t *)&dest->present, source);
-  if(!dest->present)
-    return source;
-  source = dec_varint(&dest->id, source);
-  source = dec_byte(&dest->count, source);
-  if(*source != TAG_COMPOUND) {
-    dest->nbt = NULL;
-    return ++source;
-  }
-  return dec_nbt(&dest->nbt, source);
+  // TO BE IMPLEMENTED FOR 1.8
+  return NULL;
 }
 
 void free_slot(mc_slot slot) {
@@ -1052,3 +1029,4 @@ void free_itemtag_array(mc_itemtag_array array) {
   }
   free(array.tags);
 }
+
